@@ -202,8 +202,13 @@ namespace GameOfLife
     {
         public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
 
-        protected virtual void OnPropertyChanged(string propertyName)
+        protected virtual void OnPropertyChanged(string? propertyName)
         {
+            if (string.IsNullOrEmpty(propertyName))
+            {
+                return;
+            }
+
             PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(propertyName));
         }
 

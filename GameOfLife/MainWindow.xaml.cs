@@ -31,6 +31,7 @@ namespace GameOfLife
         private readonly Dictionary<Point, RectangleGeometry> liveCellGeometries = new Dictionary<Point, RectangleGeometry>();
         private readonly Path liveCellPath = new Path { IsHitTestVisible = false };
         private readonly DispatcherTimer zoomRedrawTimer;
+        private readonly DispatcherTimer simulationTimer;
         private bool zoomRedrawPending = false;
         private const string DefaultPrefabButtonContent = "Select Prefab";
         private string? _selectedPrefabName;
@@ -40,6 +41,16 @@ namespace GameOfLife
         private readonly List<(int X, int Y)> _selectedPrefabOffsets = new();
 
         private bool IsPrefabPlacementMode => DrawModeSelector != null && DrawModeSelector.SelectedIndex == 1 && _selectedPrefabOffsets.Count > 0;
+        private bool simulationRunning = false;
+        private TimeSpan simulationInterval = TimeSpan.FromMilliseconds(200);
+        private static readonly TimeSpan[] SimulationSpeedSteps = new[]
+        {
+            TimeSpan.FromMilliseconds(600),
+            TimeSpan.FromMilliseconds(400),
+            TimeSpan.FromMilliseconds(200),
+            TimeSpan.FromMilliseconds(120),
+            TimeSpan.FromMilliseconds(60)
+        };
 
         private void ApplyTheme()
         {
@@ -153,8 +164,6 @@ namespace GameOfLife
 
         private void DrawCenterCellOutline()
         {
-            if (_centerCell == null) return;
-
             var outline = new Rectangle
             {
                 Width = cellSize,
@@ -372,6 +381,15 @@ namespace GameOfLife
             };
             zoomRedrawTimer.Tick += ZoomRedrawTimer_Tick;
 
+            simulationTimer = new DispatcherTimer
+            {
+                Interval = simulationInterval
+            };
+            simulationTimer.Tick += SimulationTimer_Tick;
+
+            ApplySimulationSpeedFromSlider();
+            UpdateSimulationButton();
+
             this.Loaded += MainWindow_Loaded;
             CanvasContainer.SizeChanged += CanvasContainer_SizeChanged;
         }
@@ -383,6 +401,8 @@ namespace GameOfLife
             {
                 brushRadius = (int)Math.Round(BrushSizeSlider.Value);
             }
+            ApplySimulationSpeedFromSlider();
+            UpdateSimulationButton();
             UpdateGridDimensions();
             DrawCells();
         }
@@ -422,15 +442,189 @@ namespace GameOfLife
         }
 
         // Simulation Buttons
-        private void Start_Click(object sender, RoutedEventArgs e) { }
-        private void StopPause_Click(object sender, RoutedEventArgs e) { }
-        private void Clear_Click(object sender, RoutedEventArgs e) { 
-        foreach (var cell in liveCells.ToList())
+        private void ToggleSimulationButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (simulationRunning)
+            {
+                StopSimulation();
+            }
+            else
+            {
+                StartSimulation();
+            }
+        }
+
+        private void Clear_Click(object sender, RoutedEventArgs e)
+        {
+            StopSimulation();
+
+            foreach (var cell in liveCells.ToList())
             {
                 liveCells.Remove(cell);
             }
             DrawCells();
 
+        }
+
+        private void StartSimulation()
+        {
+            if (simulationRunning)
+            {
+                UpdateSimulationButton();
+                return;
+            }
+
+            simulationRunning = true;
+            simulationTimer.Interval = simulationInterval;
+            simulationTimer.Start();
+            UpdateSimulationButton();
+        }
+
+        private void StopSimulation()
+        {
+            if (!simulationRunning)
+            {
+                UpdateSimulationButton();
+                return;
+            }
+
+            simulationRunning = false;
+            simulationTimer.Stop();
+            UpdateSimulationButton();
+        }
+
+        private void SimulationTimer_Tick(object? sender, EventArgs e)
+        {
+            AdvanceSimulation();
+        }
+
+        private void AdvanceSimulation()
+        {
+            lock (_gridLock)
+            {
+                if (GridWidth <= 0 || GridHeight <= 0)
+                {
+                    return;
+                }
+
+                var neighborCounts = new Dictionary<Point, int>();
+
+                foreach (var cell in liveCells)
+                {
+                    int cellX = (int)cell.X;
+                    int cellY = (int)cell.Y;
+
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        for (int dy = -1; dy <= 1; dy++)
+                        {
+                            if (dx == 0 && dy == 0)
+                            {
+                                continue;
+                            }
+
+                            int neighborX = cellX + dx;
+                            int neighborY = cellY + dy;
+
+                            if (!IsCellWithinGrid(neighborX, neighborY))
+                            {
+                                continue;
+                            }
+
+                            var neighbor = new Point(neighborX, neighborY);
+
+                            if (neighborCounts.TryGetValue(neighbor, out int count))
+                            {
+                                neighborCounts[neighbor] = count + 1;
+                            }
+                            else
+                            {
+                                neighborCounts[neighbor] = 1;
+                            }
+                        }
+                    }
+                }
+
+                var nextGeneration = new HashSet<Point>();
+
+                foreach (var cell in liveCells)
+                {
+                    int liveNeighbors = neighborCounts.TryGetValue(cell, out int count) ? count : 0;
+                    if (liveNeighbors == 2 || liveNeighbors == 3)
+                    {
+                        nextGeneration.Add(cell);
+                    }
+                }
+
+                foreach (var kvp in neighborCounts)
+                {
+                    if (!liveCells.Contains(kvp.Key) && kvp.Value == 3)
+                    {
+                        nextGeneration.Add(kvp.Key);
+                    }
+                }
+
+                if (!liveCells.SetEquals(nextGeneration))
+                {
+                    liveCells = nextGeneration;
+                    DrawCells();
+                }
+                else if (simulationRunning && liveCells.Count == 0)
+                {
+                    StopSimulation();
+                }
+            }
+        }
+
+        private void UpdateSimulationButton()
+        {
+            if (ToggleSimulationButton == null)
+            {
+                return;
+            }
+
+            if (simulationRunning)
+            {
+                ToggleSimulationButton.Content = "Stop";
+                ToggleSimulationButton.Background = Brushes.Red;
+            }
+            else
+            {
+                ToggleSimulationButton.Content = "Start";
+                ToggleSimulationButton.Background = Brushes.Green;
+            }
+
+            ToggleSimulationButton.Foreground = Brushes.White;
+            ToggleSimulationButton.BorderBrush = Brushes.Transparent;
+        }
+
+        private void SpeedSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            ApplySimulationSpeedFromSlider();
+        }
+
+        private void ApplySimulationSpeedFromSlider()
+        {
+            if (SpeedSlider == null)
+            {
+                return;
+            }
+
+            int index = (int)Math.Round(SpeedSlider.Value);
+            if (index < 0)
+            {
+                index = 0;
+            }
+            else if (index >= SimulationSpeedSteps.Length)
+            {
+                index = SimulationSpeedSteps.Length - 1;
+            }
+
+            simulationInterval = SimulationSpeedSteps[index];
+            if (simulationRunning)
+            {
+                simulationTimer.Interval = simulationInterval;
+            }
         }
 
         // DrawMode

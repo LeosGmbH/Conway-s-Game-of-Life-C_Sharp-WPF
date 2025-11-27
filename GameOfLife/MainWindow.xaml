@@ -25,8 +25,33 @@
         <!-- TOOLBAR -->
         <ToolBar DockPanel.Dock="Top" Background="#EEE" Padding="5">
 
-            <Button Content="Start" Width="70" Click="Start_Click"/>
-            <Button Content="Stop / Pause" Width="100" Click="StopPause_Click"/>
+            <Button x:Name="ToggleSimulationButton"
+                    Width="100"
+                    Content="Start"
+                    Background="Green"
+                    Foreground="White"
+                    Click="ToggleSimulationButton_Click">
+                <Button.Style>
+                    <Style TargetType="Button">
+                        <Setter Property="BorderBrush" Value="Transparent"/>
+                        <Setter Property="BorderThickness" Value="0"/>
+                        <Setter Property="Foreground" Value="White"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}"
+                                            BorderBrush="{TemplateBinding BorderBrush}"
+                                            BorderThickness="{TemplateBinding BorderThickness}"
+                                            CornerRadius="4">
+                                        <ContentPresenter HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center"/>
+                                    </Border>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Button.Style>
+            </Button>
             <Button Content="Clear" Width="70" Click="Clear_Click"/>
 
             <!-- DrawMode -->
@@ -54,9 +79,6 @@
                 </UniformGrid>
             </StackPanel>
 
-            <!-- Preview -->
-            <Button Content="Preview" Width="80" Click="Preview_Click"/>
-
             <!-- Theme Toggle -->
             <Button Content="Toggle Theme" Width="100" Click="ToggleTheme_Click"/>
 
@@ -65,6 +87,17 @@
                 <TextBlock Text="Cell Amount" HorizontalAlignment="Center"/>
                 <Slider x:Name="ZoomSlider" Minimum="13" Maximum="30" Value="13" IsSnapToTickEnabled="True" TickFrequency="1"
                         Width="150" ValueChanged="ZoomSlider_ValueChanged"/>
+            </StackPanel>
+
+            <!-- Simulation Speed -->
+            <StackPanel Margin="20,0,0,0" Width="150">
+                <TextBlock Text="Geschwindigkeit" HorizontalAlignment="Center"/>
+                <Slider x:Name="SpeedSlider" Minimum="0" Maximum="4" Value="2" IsSnapToTickEnabled="True"
+                        TickFrequency="1" Width="140" ValueChanged="SpeedSlider_ValueChanged"/>
+                <DockPanel Margin="0,2,0,0">
+                    <TextBlock Text="Langsam" DockPanel.Dock="Left"/>
+                    <TextBlock Text="Schnell" DockPanel.Dock="Right" HorizontalAlignment="Right"/>
+                </DockPanel>
             </StackPanel>
 
         </ToolBar>
