@@ -11,9 +11,9 @@ namespace GameOfLife.Converters
         {
             if (value is bool isAlive)
             {
-                return isAlive ? Colors.Black : Colors.White;
+                return isAlive ? Colors.Yellow : Colors.Transparent;
             }
-            return Colors.White;
+            return Colors.Transparent;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

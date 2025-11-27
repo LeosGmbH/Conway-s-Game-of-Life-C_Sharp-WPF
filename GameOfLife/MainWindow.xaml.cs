@@ -34,6 +34,12 @@ namespace GameOfLife
         private bool zoomRedrawPending = false;
         private const string DefaultPrefabButtonContent = "Select Prefab";
         private string? _selectedPrefabName;
+        private bool[,]? _selectedPrefabCells;
+        private int _selectedPrefabWidth;
+        private int _selectedPrefabHeight;
+        private readonly List<(int X, int Y)> _selectedPrefabOffsets = new();
+
+        private bool IsPrefabPlacementMode => DrawModeSelector != null && DrawModeSelector.SelectedIndex == 1 && _selectedPrefabOffsets.Count > 0;
 
         private void ApplyTheme()
         {
@@ -217,7 +223,7 @@ namespace GameOfLife
 
             hoverCenterCell = new Point(centerX, centerY);
 
-            foreach (var cell in EnumerateBrushCells(hoverCenterCell.Value))
+            foreach (var cell in EnumeratePlacementCells(hoverCenterCell.Value))
             {
                 hoverCells.Add(cell);
             }
@@ -255,6 +261,31 @@ namespace GameOfLife
                         yield return new Point(x, y);
                     }
                 }
+            }
+        }
+
+        private IEnumerable<Point> EnumeratePlacementCells(Point anchor)
+        {
+            if (IsPrefabPlacementMode && _selectedPrefabCells != null && _selectedPrefabOffsets.Count > 0)
+            {
+                int baseX = (int)anchor.X;
+                int baseY = (int)anchor.Y;
+
+                foreach (var (offsetX, offsetY) in _selectedPrefabOffsets)
+                {
+                    int x = baseX + offsetX;
+                    int y = baseY + offsetY;
+                    if (IsCellWithinGrid(x, y))
+                    {
+                        yield return new Point(x, y);
+                    }
+                }
+                yield break;
+            }
+
+            foreach (var cell in EnumerateBrushCells(anchor))
+            {
+                yield return cell;
             }
         }
 
@@ -296,7 +327,7 @@ namespace GameOfLife
 
         private void ApplyBrush(Point center, bool add)
         {
-            foreach (var cell in EnumerateBrushCells(center))
+            foreach (var cell in EnumeratePlacementCells(center))
             {
                 UpdateCell(cell, add);
             }
@@ -407,6 +438,7 @@ namespace GameOfLife
         {
             if (PrefabSelectorButton == null) return;  // <- schützt vor NullReferenceException
             PrefabSelectorButton.IsEnabled = DrawModeSelector.SelectedIndex == 1;
+            ClearHoverPreview();
         }
 
 
@@ -421,7 +453,49 @@ namespace GameOfLife
             if (result == true && previewWindow.SelectedPattern != null)
             {
                 _selectedPrefabName = previewWindow.SelectedPattern.Name;
+                StoreSelectedPrefab(previewWindow.SelectedPattern.CellStates);
                 UpdatePrefabButtonContent();
+                ClearHoverPreview();
+            }
+        }
+
+        private void StoreSelectedPrefab(bool[,]? cells)
+        {
+            if (cells == null)
+            {
+                _selectedPrefabCells = null;
+                _selectedPrefabWidth = 0;
+                _selectedPrefabHeight = 0;
+                _selectedPrefabOffsets.Clear();
+                return;
+            }
+
+            int width = cells.GetLength(0);
+            int height = cells.GetLength(1);
+
+            var clone = new bool[width, height];
+            for (int x = 0; x < width; x++)
+            {
+                for (int y = 0; y < height; y++)
+                {
+                    clone[x, y] = cells[x, y];
+                }
+            }
+
+            _selectedPrefabCells = clone;
+            _selectedPrefabWidth = width;
+            _selectedPrefabHeight = height;
+
+            _selectedPrefabOffsets.Clear();
+            for (int x = 0; x < width; x++)
+            {
+                for (int y = 0; y < height; y++)
+                {
+                    if (clone[x, y])
+                    {
+                        _selectedPrefabOffsets.Add((x, y));
+                    }
+                }
             }
         }
 
