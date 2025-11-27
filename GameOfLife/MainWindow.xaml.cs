@@ -16,7 +16,7 @@ namespace GameOfLife
         // Grid-Einstellungen
         private int GridWidth;
         private int GridHeight;
-        private double cellSize = 20; // Default cell size
+        private double cellSize; 
         private Point _centerCell;
 
         private bool isDarkMode = true;
@@ -169,6 +169,7 @@ namespace GameOfLife
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            UpdateCellSizeFromSlider();
             UpdateGridDimensions();
             DrawCells();
         }
@@ -238,6 +239,12 @@ namespace GameOfLife
         }
 
         // Zoom
+        private void UpdateCellSizeFromSlider()
+        {
+            if (ZoomSlider == null) return;
+            cellSize = (ZoomSlider.Maximum + ZoomSlider.Minimum) - ZoomSlider.Value;
+        }
+
         private void ZoomSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (GameCanvas == null) return; // Prevent crash on initialization
@@ -246,8 +253,7 @@ namespace GameOfLife
             {
                 Point oldCenter = _centerCell;
 
-                // Invert the slider logic as requested: Left (min value) = Large Cells, Right (max value) = Small Cells
-                cellSize = (ZoomSlider.Maximum + ZoomSlider.Minimum) - e.NewValue;
+                UpdateCellSizeFromSlider();
                 UpdateGridDimensions(); // This now calculates the new center cell
 
                 Point newCenter = _centerCell;
