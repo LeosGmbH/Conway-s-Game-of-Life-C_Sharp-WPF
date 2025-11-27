@@ -2,7 +2,23 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Conway's Game of Life Editor" Height="700" Width="1000"
-        Background="#F5F5F5">
+        Background="{DynamicResource WindowBackgroundColor}">
+
+    <Window.Resources>
+        <!-- Dark Theme -->
+        <SolidColorBrush x:Key="DarkWindowBackgroundColor" Color="#1e1e1e"/>
+        <SolidColorBrush x:Key="DarkGridLineColor" Color="White"/>
+        <SolidColorBrush x:Key="DarkDeadCellColor" Color="Black"/>
+        <SolidColorBrush x:Key="DarkLiveCellColor" Color="Yellow"/>
+        <SolidColorBrush x:Key="DarkToolbarColor" Color="#2d2d2d"/>
+
+        <!-- Light Theme -->
+        <SolidColorBrush x:Key="LightWindowBackgroundColor" Color="#F5F5F5"/>
+        <SolidColorBrush x:Key="LightGridLineColor" Color="Gray"/>
+        <SolidColorBrush x:Key="LightDeadCellColor" Color="White"/>
+        <SolidColorBrush x:Key="LightLiveCellColor" Color="Black"/>
+        <SolidColorBrush x:Key="LightToolbarColor" Color="#EEE"/>
+    </Window.Resources>
 
     <DockPanel>
 
@@ -30,6 +46,9 @@
             <!-- Preview -->
             <Button Content="Preview" Width="80" Click="Preview_Click"/>
 
+            <!-- Theme Toggle -->
+            <Button Content="Toggle Theme" Width="100" Click="ToggleTheme_Click"/>
+
             <!-- Zoom -->
             <StackPanel Margin="20,0,0,0">
                 <TextBlock Text="Zoom" HorizontalAlignment="Center"/>
@@ -43,10 +62,8 @@
         <ScrollViewer x:Name="Scroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
               ScrollChanged="Scroll_ScrollChanged">
             <Canvas x:Name="GameCanvas" Background="#222"
-            MouseLeftButtonDown="Canvas_LeftDown"
-            MouseLeftButtonUp="Canvas_LeftUp"
-            MouseRightButtonDown="Canvas_RightDown"
-            MouseRightButtonUp="Canvas_RightUp"
+            MouseLeftButtonDown="Canvas_MouseUp"
+            MouseLeftButtonUp="Canvas_MouseDown"
             MouseMove="Canvas_MouseMove"
             MouseDown="Canvas_MouseDown"
             MouseWheel="Canvas_MouseWheel"/>
