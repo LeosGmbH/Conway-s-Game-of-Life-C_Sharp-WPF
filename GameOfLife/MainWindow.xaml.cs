@@ -75,6 +75,7 @@ namespace GameOfLife
 
                 GameCanvas.Children.Clear();
                 liveCellPath.Fill = (Brush)Resources["LiveCellColor"];
+                liveCellPath.Stroke = (Brush)Resources["DeadCellColor"];
                 liveCellGeometryGroup.Children.Clear();
                 liveCellGeometries.Clear();
                 hoverVisuals.Clear();
@@ -331,6 +332,7 @@ namespace GameOfLife
             InitializeComponent();
             ApplyTheme();
 
+            liveCellPath.StrokeThickness = 0.5;
             zoomRedrawTimer = new DispatcherTimer
             {
                 Interval = TimeSpan.FromMilliseconds(50)
