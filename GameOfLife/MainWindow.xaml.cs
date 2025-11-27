@@ -1,5 +1,5 @@
-﻿
-
+﻿using System;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -21,6 +21,9 @@ namespace GameOfLife
 
         private bool isDarkMode = true;
         private readonly object _gridLock = new object();
+        private int brushRadius = 0;
+        private readonly List<Point> hoverCells = new List<Point>();
+        private Point? hoverCenterCell = null;
 
         private void ApplyTheme()
         {
@@ -72,6 +75,7 @@ namespace GameOfLife
                 DrawGrid(startX, startY, endX, endY);
                 DrawLiveCells(startX, startY, endX, endY);
                 DrawCenterCellOutline(); // Draw the center cell highlight
+                DrawHoverPreview();
             }
         }
 
@@ -152,6 +156,124 @@ namespace GameOfLife
             GameCanvas.Children.Add(outline);
         }
 
+        private void DrawHoverPreview()
+        {
+            if (hoverCells.Count == 0) return;
+
+            foreach (var cell in hoverCells)
+            {
+                var outline = new Rectangle
+                {
+                    Width = cellSize,
+                    Height = cellSize,
+                    Stroke = Brushes.Red,
+                    StrokeThickness = 1,
+                    Fill = Brushes.Transparent
+                };
+
+                Canvas.SetLeft(outline, cell.X * cellSize);
+                Canvas.SetTop(outline, cell.Y * cellSize);
+                GameCanvas.Children.Add(outline);
+            }
+        }
+
+        private void UpdateHoverCells(Point center)
+        {
+            hoverCells.Clear();
+
+            int centerX = (int)center.X;
+            int centerY = (int)center.Y;
+
+            if (!IsCellWithinGrid(centerX, centerY))
+            {
+                hoverCenterCell = null;
+                return;
+            }
+
+            hoverCenterCell = new Point(centerX, centerY);
+
+            foreach (var cell in EnumerateBrushCells(hoverCenterCell.Value))
+            {
+                hoverCells.Add(cell);
+            }
+        }
+
+        private void ClearHoverPreview()
+        {
+            if (hoverCells.Count == 0 && !hoverCenterCell.HasValue)
+            {
+                return;
+            }
+
+            hoverCells.Clear();
+            hoverCenterCell = null;
+            DrawCells();
+        }
+
+        private IEnumerable<Point> EnumerateBrushCells(Point center)
+        {
+            int baseX = (int)center.X;
+            int baseY = (int)center.Y;
+
+            for (int dx = -brushRadius; dx <= brushRadius; dx++)
+            {
+                for (int dy = -brushRadius; dy <= brushRadius; dy++)
+                {
+                    int x = baseX + dx;
+                    int y = baseY + dy;
+
+                    if (IsCellWithinGrid(x, y))
+                    {
+                        yield return new Point(x, y);
+                    }
+                }
+            }
+        }
+
+        private bool TryGetCellFromMouse(Point mousePosition, out Point cell)
+        {
+            cell = new Point(-1, -1);
+
+            if (GridWidth <= 0 || GridHeight <= 0 || cellSize <= 0)
+            {
+                return false;
+            }
+
+            if (double.IsNaN(mousePosition.X) || double.IsNaN(mousePosition.Y))
+            {
+                return false;
+            }
+
+            if (mousePosition.X < 0 || mousePosition.Y < 0)
+            {
+                return false;
+            }
+
+            int cellX = (int)(mousePosition.X / cellSize);
+            int cellY = (int)(mousePosition.Y / cellSize);
+
+            if (!IsCellWithinGrid(cellX, cellY))
+            {
+                return false;
+            }
+
+            cell = new Point(cellX, cellY);
+            return true;
+        }
+
+        private bool IsCellWithinGrid(int x, int y)
+        {
+            return x >= 0 && x < GridWidth && y >= 0 && y < GridHeight;
+        }
+
+        private void ApplyBrush(Point center, bool add)
+        {
+            foreach (var cell in EnumerateBrushCells(center))
+            {
+                UpdateCell(cell, add);
+            }
+        }
+
 
 
 
@@ -170,6 +292,10 @@ namespace GameOfLife
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             UpdateCellSizeFromSlider();
+            if (BrushSizeSlider != null)
+            {
+                brushRadius = (int)Math.Round(BrushSizeSlider.Value);
+            }
             UpdateGridDimensions();
             DrawCells();
         }
@@ -275,6 +401,16 @@ namespace GameOfLife
             }
         }
 
+        private void BrushSizeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            brushRadius = (int)Math.Round(e.NewValue);
+            if (hoverCenterCell.HasValue)
+            {
+                UpdateHoverCells(hoverCenterCell.Value);
+            }
+            DrawCells();
+        }
+
 
         private void UpdateGridDimensions()
         {
@@ -307,18 +443,24 @@ namespace GameOfLife
 
         private void Canvas_MouseMove(object sender, MouseEventArgs e)
         {
+            if (GameCanvas == null || cellSize <= 0) return;
+
             Point mousePos = e.GetPosition(GameCanvas);
-            int cellX = (int)(mousePos.X / cellSize);
-            int cellY = (int)(mousePos.Y / cellSize);
-            Point currentCell = new Point(cellX, cellY);
-
-            // Wenn die Maus nicht über eine neue Zelle bewegt wird, nichts tun
-            if (lastCell.HasValue && lastCell.Value == currentCell)
+            if (!TryGetCellFromMouse(mousePos, out Point currentCell))
+            {
+                ClearHoverPreview();
+                lastCell = null;
                 return;
+            }
 
-            if (e.LeftButton == MouseButtonState.Pressed)
+            UpdateHoverCells(currentCell);
+
+            bool leftPressed = e.LeftButton == MouseButtonState.Pressed;
+            bool rightPressed = e.RightButton == MouseButtonState.Pressed;
+
+            if (leftPressed)
                 AddCellsBetween(lastCell, currentCell, true);
-            else if (e.RightButton == MouseButtonState.Pressed)
+            else if (rightPressed)
                 AddCellsBetween(lastCell, currentCell, false);
 
             lastCell = currentCell;
@@ -335,7 +477,7 @@ namespace GameOfLife
         {
             if (start == null)
             {
-                UpdateCell(end, add);
+                ApplyBrush(end, add);
                 return;
             }
 
@@ -352,7 +494,7 @@ namespace GameOfLife
 
             while (true)
             {
-                UpdateCell(new Point(x0, y0), add);
+                ApplyBrush(new Point(x0, y0), add);
                 if (x0 == x1 && y0 == y1) break;
                 int e2 = 2 * err;
                 if (e2 > -dy) { err -= dy; x0 += sx; }
@@ -362,6 +504,16 @@ namespace GameOfLife
 
         private void UpdateCell(Point cell, bool add)
         {
+            int cellX = (int)cell.X;
+            int cellY = (int)cell.Y;
+
+            if (!IsCellWithinGrid(cellX, cellY))
+            {
+                return;
+            }
+
+            cell = new Point(cellX, cellY);
+
             if (add)
             {
                 if (!liveCells.Contains(cell))
@@ -379,11 +531,35 @@ namespace GameOfLife
         
         private void Canvas_MouseLeave(object sender, MouseEventArgs e)
         {
+            ClearHoverPreview();
             lastCell = null;
         }
         private void Canvas_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            // Leere Methode, da kein Panning mehr benötigt wird
+            if (GameCanvas == null || cellSize <= 0) return;
+
+            Point mousePos = e.GetPosition(GameCanvas);
+            if (!TryGetCellFromMouse(mousePos, out Point cell))
+            {
+                return;
+            }
+
+            if (e.ChangedButton == MouseButton.Left)
+            {
+                ApplyBrush(cell, true);
+            }
+            else if (e.ChangedButton == MouseButton.Right)
+            {
+                ApplyBrush(cell, false);
+            }
+            else
+            {
+                return;
+            }
+
+            lastCell = cell;
+            UpdateHoverCells(cell);
+            DrawCells();
         }
     }
 }

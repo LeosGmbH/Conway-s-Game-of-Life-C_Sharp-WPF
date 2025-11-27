@@ -43,6 +43,18 @@
                 <ComboBoxItem Content="Gosper Gun"/>
             </ComboBox>
 
+            <!-- Brush Size -->
+            <StackPanel Margin="20,0,0,0" Width="130">
+                <TextBlock Text="Pinselgröße" HorizontalAlignment="Center"/>
+                <Slider x:Name="BrushSizeSlider" Minimum="0" Maximum="2" Value="0" IsSnapToTickEnabled="True"
+                        TickFrequency="1" TickPlacement="BottomRight" Width="120" ValueChanged="BrushSizeSlider_ValueChanged"/>
+                <UniformGrid Columns="3" Margin="0,2,0,0">
+                    <TextBlock Text="1x1" HorizontalAlignment="Center"/>
+                    <TextBlock Text="3x3" HorizontalAlignment="Center"/>
+                    <TextBlock Text="5x5" HorizontalAlignment="Center"/>
+                </UniformGrid>
+            </StackPanel>
+
             <!-- Preview -->
             <Button Content="Preview" Width="80" Click="Preview_Click"/>
 
@@ -61,10 +73,8 @@
         <!-- SPIEL-CANVAS -->
         <Border x:Name="CanvasContainer" ClipToBounds="True">
             <Canvas x:Name="GameCanvas" Background="#222"
-            MouseLeftButtonDown="Canvas_MouseUp"
-            MouseLeftButtonUp="Canvas_MouseDown"
-            MouseMove="Canvas_MouseMove"
             MouseDown="Canvas_MouseDown"
+            MouseMove="Canvas_MouseMove"
             MouseUp="Canvas_MouseUp"
             MouseLeave="Canvas_MouseLeave"/>
         </Border>
