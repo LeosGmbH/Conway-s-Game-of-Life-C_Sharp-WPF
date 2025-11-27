@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 
 namespace GameOfLife
 {
@@ -26,7 +27,11 @@ namespace GameOfLife
         private readonly List<Point> hoverCells = new List<Point>();
         private Point? hoverCenterCell = null;
         private readonly List<Rectangle> hoverVisuals = new List<Rectangle>();
-        private readonly Dictionary<Point, Rectangle> liveCellVisuals = new Dictionary<Point, Rectangle>();
+        private readonly GeometryGroup liveCellGeometryGroup = new GeometryGroup();
+        private readonly Dictionary<Point, RectangleGeometry> liveCellGeometries = new Dictionary<Point, RectangleGeometry>();
+        private readonly Path liveCellPath = new Path { IsHitTestVisible = false };
+        private readonly DispatcherTimer zoomRedrawTimer;
+        private bool zoomRedrawPending = false;
 
         private void ApplyTheme()
         {
@@ -69,7 +74,9 @@ namespace GameOfLife
                 }
 
                 GameCanvas.Children.Clear();
-                liveCellVisuals.Clear();
+                liveCellPath.Fill = (Brush)Resources["LiveCellColor"];
+                liveCellGeometryGroup.Children.Clear();
+                liveCellGeometries.Clear();
                 hoverVisuals.Clear();
 
                 int startX = 0;
@@ -78,6 +85,8 @@ namespace GameOfLife
                 int endY = GridHeight - 1;
 
                 DrawGrid(startX, startY, endX, endY);
+                liveCellPath.Data = liveCellGeometryGroup;
+                GameCanvas.Children.Add(liveCellPath);
                 DrawLiveCells(startX, startY, endX, endY);
                 DrawCenterCellOutline(); // Draw the center cell highlight
                 DrawHoverPreview();
@@ -292,31 +301,22 @@ namespace GameOfLife
 
         private void AddLiveCellVisual(Point cell)
         {
-            if (liveCellVisuals.ContainsKey(cell))
+            if (liveCellGeometries.ContainsKey(cell))
             {
                 return;
             }
 
-            var rect = new Rectangle
-            {
-                Width = cellSize,
-                Height = cellSize,
-                Fill = (Brush)Resources["LiveCellColor"],
-                IsHitTestVisible = false
-            };
-
-            Canvas.SetLeft(rect, cell.X * cellSize);
-            Canvas.SetTop(rect, cell.Y * cellSize);
-            GameCanvas.Children.Add(rect);
-            liveCellVisuals[cell] = rect;
+            var rectGeometry = new RectangleGeometry(new Rect(cell.X * cellSize, cell.Y * cellSize, cellSize, cellSize));
+            liveCellGeometries[cell] = rectGeometry;
+            liveCellGeometryGroup.Children.Add(rectGeometry);
         }
 
         private void RemoveLiveCellVisual(Point cell)
         {
-            if (liveCellVisuals.TryGetValue(cell, out var rect))
+            if (liveCellGeometries.TryGetValue(cell, out var geometry))
             {
-                GameCanvas.Children.Remove(rect);
-                liveCellVisuals.Remove(cell);
+                liveCellGeometryGroup.Children.Remove(geometry);
+                liveCellGeometries.Remove(cell);
             }
         }
 
@@ -330,6 +330,12 @@ namespace GameOfLife
         {
             InitializeComponent();
             ApplyTheme();
+
+            zoomRedrawTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(50)
+            };
+            zoomRedrawTimer.Tick += ZoomRedrawTimer_Tick;
 
             this.Loaded += MainWindow_Loaded;
             CanvasContainer.SizeChanged += CanvasContainer_SizeChanged;
@@ -421,27 +427,47 @@ namespace GameOfLife
         {
             if (GameCanvas == null) return; // Prevent crash on initialization
 
+            UpdateCellSizeFromSlider();
+
+            zoomRedrawPending = true;
+            zoomRedrawTimer.Stop();
+            zoomRedrawTimer.Start();
+        }
+
+        private void ZoomRedrawTimer_Tick(object? sender, EventArgs e)
+        {
+            zoomRedrawTimer.Stop();
+
+            if (!zoomRedrawPending)
+            {
+                return;
+            }
+
+            zoomRedrawPending = false;
+
             lock (_gridLock)
             {
                 Point oldCenter = _centerCell;
 
-                UpdateCellSizeFromSlider();
                 UpdateGridDimensions(); // This now calculates the new center cell
 
                 Point newCenter = _centerCell;
                 double shiftX = newCenter.X - oldCenter.X;
                 double shiftY = newCenter.Y - oldCenter.Y;
 
-                var newLiveCells = new HashSet<Point>();
-                foreach (var cell in liveCells)
+                if (shiftX != 0 || shiftY != 0)
                 {
-                    var newPoint = new Point(cell.X + shiftX, cell.Y + shiftY);
-                    if (newPoint.X >= 0 && newPoint.X < GridWidth && newPoint.Y >= 0 && newPoint.Y < GridHeight)
+                    var newLiveCells = new HashSet<Point>();
+                    foreach (var cell in liveCells)
                     {
-                        newLiveCells.Add(newPoint);
+                        var newPoint = new Point(cell.X + shiftX, cell.Y + shiftY);
+                        if (newPoint.X >= 0 && newPoint.X < GridWidth && newPoint.Y >= 0 && newPoint.Y < GridHeight)
+                        {
+                            newLiveCells.Add(newPoint);
+                        }
                     }
+                    liveCells = newLiveCells;
                 }
-                liveCells = newLiveCells;
 
                 DrawCells();
             }
