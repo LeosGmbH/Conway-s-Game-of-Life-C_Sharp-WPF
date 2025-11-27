@@ -1,0 +1,89 @@
+﻿<Window x:Class="GameOfLife.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Conway's Game of Life" Height="600" Width="800"
+        Background="#F5F5F5">
+
+    <Window.Resources>
+        <!-- DropShadowEffect in Window.Resources verschoben, damit es global zugänglich ist -->
+        <DropShadowEffect x:Key="ButtonShadow" ShadowDepth="1" Direction="270" Color="Gray" Opacity="0.5" BlurRadius="2"/>
+    </Window.Resources>
+
+    <DockPanel>
+        <!-- Kontrollbereich: Top Dock -->
+        <!-- StackPanel durch Border ersetzt, um Padding und CornerRadius korrekt anzuwenden -->
+        <Border DockPanel.Dock="Top" Margin="10" Background="White" Padding="10" 
+                Effect="{StaticResource ButtonShadow}" CornerRadius="6">
+
+            <!-- Stil-Definitionen für Buttons und ToggleButton -->
+            <Border.Resources>
+                <Style TargetType="Button">
+                    <Setter Property="Width" Value="80"/>
+                    <Setter Property="Margin" Value="5"/>
+                    <Setter Property="Padding" Value="5"/>
+                    <Setter Property="Background" Value="#007ACC"/>
+                    <Setter Property="Foreground" Value="White"/>
+                    <Setter Property="FontWeight" Value="Bold"/>
+                    <Setter Property="BorderBrush" Value="#005D99"/>
+                    <Setter Property="BorderThickness" Value="1"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="Button">
+                                <Border Background="{TemplateBinding Background}" 
+                                        BorderBrush="{TemplateBinding BorderBrush}" 
+                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                        CornerRadius="4">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+
+                <Style TargetType="ToggleButton">
+                    <Setter Property="Width" Value="120"/>
+                    <Setter Property="Margin" Value="5"/>
+                    <Setter Property="Padding" Value="5"/>
+                    <Setter Property="Background" Value="#4CAF50"/>
+                    <Setter Property="Foreground" Value="White"/>
+                    <Setter Property="FontWeight" Value="Bold"/>
+                    <Setter Property="BorderBrush" Value="#388E3C"/>
+                    <Setter Property="BorderThickness" Value="1"/>
+                    <Setter Property="Content" Value="Draw Mode: ON"/>
+                    <Style.Triggers>
+                        <Trigger Property="IsChecked" Value="False">
+                            <Setter Property="Content" Value="Draw Mode: OFF"/>
+                            <Setter Property="Background" Value="#F44336"/>
+                            <Setter Property="BorderBrush" Value="#D32F2F"/>
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Resources>
+
+            <!-- Innerer StackPanel für die horizontale Anordnung der Buttons, zentriert -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+
+                <!-- Buttons für Steuerung (Logik folgt in C#) -->
+                <Button x:Name="StartButton" Content="Start" Click="StartButton_Click"/>
+                <Button x:Name="StopButton" Content="Stop" Click="StopButton_Click"/>
+                <Button x:Name="RandomButton" Content="Random" Click="RandomButton_Click"/>
+                <Button x:Name="ClearButton" Content="ClearButton_Click" Width="117" Click="ClearButton_Click"/>
+
+                <!-- ToggleButton für den Zeichenmodus -->
+                <ToggleButton x:Name="DrawModeToggle" 
+                            IsChecked="True" 
+                            VerticalAlignment="Center"/>
+            </StackPanel>
+
+        </Border>
+
+        <!-- Spielbereich: Füllt den Rest -->
+        <!-- Das Canvas reagiert auf die Maus-Events, um das Malen zu ermöglichen -->
+        <Canvas x:Name="GameCanvas" 
+                Background="#111111" 
+                MouseDown="GameCanvas_MouseDown"
+                MouseMove="GameCanvas_MouseMove"
+                MouseUp="GameCanvas_MouseUp"/>
+    </DockPanel>
+
+</Window>
