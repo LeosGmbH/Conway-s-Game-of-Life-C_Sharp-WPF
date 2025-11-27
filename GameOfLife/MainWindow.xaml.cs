@@ -14,11 +14,10 @@ namespace GameOfLife
         private HashSet<Point> liveCells = new HashSet<Point>();
 
         // Grid-Einstellungen
-        private int _baseGridWidth = 10;
-        private int _zoomLevel = 0;
         private int GridWidth;
         private int GridHeight;
-        private double cellSize;
+        private double cellSize = 20; // Default cell size
+        private Point _centerCell;
 
         private bool isDarkMode = true;
         private readonly object _gridLock = new object();
@@ -65,15 +64,14 @@ namespace GameOfLife
 
                 GameCanvas.Children.Clear();
 
-                // Begrenze die Sichtbarkeit auf das Grid
                 int startX = 0;
                 int startY = 0;
                 int endX = GridWidth - 1;
                 int endY = GridHeight - 1;
 
-                // Zeichne das sichtbare Grid
                 DrawGrid(startX, startY, endX, endY);
                 DrawLiveCells(startX, startY, endX, endY);
+                DrawCenterCellOutline(); // Draw the center cell highlight
             }
         }
 
@@ -136,6 +134,24 @@ namespace GameOfLife
             }
         }
 
+        private void DrawCenterCellOutline()
+        {
+            if (_centerCell == null) return;
+
+            var outline = new Rectangle
+            {
+                Width = cellSize,
+                Height = cellSize,
+                Stroke = Brushes.Red,
+                StrokeThickness = 1,
+                Fill = Brushes.Transparent
+            };
+
+            Canvas.SetLeft(outline, _centerCell.X * cellSize);
+            Canvas.SetTop(outline, _centerCell.Y * cellSize);
+            GameCanvas.Children.Add(outline);
+        }
+
 
 
 
@@ -161,7 +177,32 @@ namespace GameOfLife
         {
             lock (_gridLock)
             {
-                UpdateGridDimensions();
+                Point oldCenter = _centerCell;
+
+                UpdateGridDimensions(); // This calculates the new center
+
+                Point newCenter = _centerCell;
+                double shiftX = newCenter.X - oldCenter.X;
+                double shiftY = newCenter.Y - oldCenter.Y;
+
+                // No need to shift if the center hasn't moved
+                if (shiftX == 0 && shiftY == 0)
+                {
+                    DrawCells();
+                    return;
+                }
+
+                var newLiveCells = new HashSet<Point>();
+                foreach (var cell in liveCells)
+                {
+                    var newPoint = new Point(cell.X + shiftX, cell.Y + shiftY);
+                    if (newPoint.X >= 0 && newPoint.X < GridWidth && newPoint.Y >= 0 && newPoint.Y < GridHeight)
+                    {
+                        newLiveCells.Add(newPoint);
+                    }
+                }
+                liveCells = newLiveCells;
+
                 DrawCells();
             }
         }
@@ -203,23 +244,16 @@ namespace GameOfLife
 
             lock (_gridLock)
             {
-                int oldZoomLevel = _zoomLevel;
-                int newZoomLevel = (int)e.NewValue;
+                Point oldCenter = _centerCell;
 
-                if (oldZoomLevel == newZoomLevel) return;
+                // Invert the slider logic as requested: Left (min value) = Large Cells, Right (max value) = Small Cells
+                cellSize = (ZoomSlider.Maximum + ZoomSlider.Minimum) - e.NewValue;
+                UpdateGridDimensions(); // This now calculates the new center cell
 
-                int oldGridWidth = GridWidth;
-                int oldGridHeight = GridHeight;
+                Point newCenter = _centerCell;
+                double shiftX = newCenter.X - oldCenter.X;
+                double shiftY = newCenter.Y - oldCenter.Y;
 
-                // First, calculate the new dimensions
-                _zoomLevel = newZoomLevel;
-                UpdateGridDimensions();
-
-                // Calculate the actual shift needed for both axes
-                int shiftX = (GridWidth - oldGridWidth) / 2;
-                int shiftY = (GridHeight - oldGridHeight) / 2;
-
-                // Then, create the new set of live cells, shifted and filtered
                 var newLiveCells = new HashSet<Point>();
                 foreach (var cell in liveCells)
                 {
@@ -239,19 +273,26 @@ namespace GameOfLife
         private void UpdateGridDimensions()
         {
             if (CanvasContainer == null || GameCanvas == null || CanvasContainer.ActualWidth <= 0 || CanvasContainer.ActualHeight <= 0) return;
+            if (cellSize <= 0) return;
 
-            GridWidth = _baseGridWidth + _zoomLevel * 2;
+            // Calculate how many cells fit and ensure the number is odd
+            GridWidth = (int)Math.Floor(CanvasContainer.ActualWidth / cellSize);
+            if (GridWidth % 2 == 0) GridWidth--; // Make it odd
 
-            // Calculate cell size based on width
-            cellSize = CanvasContainer.ActualWidth / GridWidth;
-
-            if (cellSize <= 0) return; // Prevent division by zero
-
-            // Calculate grid height to fill the canvas with square cells
             GridHeight = (int)Math.Floor(CanvasContainer.ActualHeight / cellSize);
+            if (GridHeight % 2 == 0) GridHeight--; // Make it odd
 
+            // Update the center cell coordinate
+            _centerCell = new Point(GridWidth / 2, GridHeight / 2);
+
+            // Set the canvas size to be a multiple of the cell size
             GameCanvas.Width = GridWidth * cellSize;
             GameCanvas.Height = GridHeight * cellSize;
+
+            // Center the canvas within the container
+            double offsetX = (CanvasContainer.ActualWidth - GameCanvas.Width) / 2;
+            double offsetY = (CanvasContainer.ActualHeight - GameCanvas.Height) / 2;
+            GameCanvas.Margin = new Thickness(offsetX, offsetY, 0, 0);
         }
 
         // Canvas Interaktion

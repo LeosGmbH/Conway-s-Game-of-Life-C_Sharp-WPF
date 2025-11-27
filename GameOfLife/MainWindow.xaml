@@ -51,8 +51,8 @@
 
             <!-- Zoom -->
             <StackPanel Margin="20,0,0,0">
-                <TextBlock Text="GridSize" HorizontalAlignment="Center"/>
-                <Slider x:Name="ZoomSlider" Minimum="35" Maximum="70" Value="0" IsSnapToTickEnabled="True" TickFrequency="1"
+                <TextBlock Text="Cell Amount" HorizontalAlignment="Center"/>
+                <Slider x:Name="ZoomSlider" Minimum="5" Maximum="30" Value="5" IsSnapToTickEnabled="True" TickFrequency="1"
                         Width="150" ValueChanged="ZoomSlider_ValueChanged"/>
             </StackPanel>
 
