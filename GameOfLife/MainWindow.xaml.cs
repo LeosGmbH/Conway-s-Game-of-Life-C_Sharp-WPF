@@ -28,6 +28,7 @@ namespace GameOfLife
         private Point? hoverCenterCell = null;
         private readonly List<Rectangle> hoverVisuals = new List<Rectangle>();
         private readonly Path liveCellPath = new Path { IsHitTestVisible = false };
+        private readonly Path liveCellOutlinePath = new Path { IsHitTestVisible = false };
         private readonly Path gridPath = new Path { IsHitTestVisible = false };
         private StreamGeometry liveCellsGeometry = new StreamGeometry();
         private StreamGeometry gridGeometry = new StreamGeometry();
@@ -117,8 +118,12 @@ namespace GameOfLife
 
                 RenderLiveCellsGeometry();
 
-                GameCanvas.Children.Add(gridPath);
+                liveCellOutlinePath.Stroke = (Brush)Resources["DeadCellColor"];
+                liveCellOutlinePath.Data = liveCellsGeometry;
+
                 GameCanvas.Children.Add(liveCellPath);
+                GameCanvas.Children.Add(gridPath);
+                GameCanvas.Children.Add(liveCellOutlinePath);
                 DrawCenterCellOutline();
                 DrawHoverPreview();
             }
@@ -158,6 +163,7 @@ namespace GameOfLife
             if (!liveCellsDirty)
             {
                 liveCellPath.Data = liveCellsGeometry;
+                liveCellOutlinePath.Data = liveCellsGeometry;
                 return;
             }
 
@@ -180,6 +186,7 @@ namespace GameOfLife
             geometry.Freeze();
             liveCellsGeometry = geometry;
             liveCellPath.Data = liveCellsGeometry;
+            liveCellOutlinePath.Data = liveCellsGeometry;
             liveCellsDirty = false;
         }
 
@@ -188,6 +195,7 @@ namespace GameOfLife
             liveCellsDirty = true;
             RenderLiveCellsGeometry();
             liveCellPath.InvalidateVisual();
+            liveCellOutlinePath.InvalidateVisual();
         }
 
         private void DrawCenterCellOutline()
@@ -382,6 +390,9 @@ namespace GameOfLife
 
             liveCellPath.StrokeThickness = 0.5;
             gridPath.StrokeThickness = 0.5;
+            liveCellOutlinePath.StrokeThickness = 0.5;
+            liveCellOutlinePath.Fill = Brushes.Transparent;
+
         
             zoomRedrawTimer = new DispatcherTimer
             {
