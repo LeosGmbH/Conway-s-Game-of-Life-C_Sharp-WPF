@@ -24,6 +24,7 @@ namespace GameOfLife
         private int brushRadius = 0;
         private readonly List<Point> hoverCells = new List<Point>();
         private Point? hoverCenterCell = null;
+        private readonly List<Rectangle> hoverVisuals = new List<Rectangle>();
 
         private void ApplyTheme()
         {
@@ -158,6 +159,12 @@ namespace GameOfLife
 
         private void DrawHoverPreview()
         {
+            foreach (var outline in hoverVisuals)
+            {
+                GameCanvas.Children.Remove(outline);
+            }
+            hoverVisuals.Clear();
+
             if (hoverCells.Count == 0) return;
 
             foreach (var cell in hoverCells)
@@ -174,6 +181,7 @@ namespace GameOfLife
                 Canvas.SetLeft(outline, cell.X * cellSize);
                 Canvas.SetTop(outline, cell.Y * cellSize);
                 GameCanvas.Children.Add(outline);
+                hoverVisuals.Add(outline);
             }
         }
 
@@ -200,14 +208,18 @@ namespace GameOfLife
 
         private void ClearHoverPreview()
         {
-            if (hoverCells.Count == 0 && !hoverCenterCell.HasValue)
+            if (hoverCells.Count == 0 && !hoverCenterCell.HasValue && hoverVisuals.Count == 0)
             {
                 return;
             }
 
             hoverCells.Clear();
             hoverCenterCell = null;
-            DrawCells();
+            foreach (var outline in hoverVisuals)
+            {
+                GameCanvas.Children.Remove(outline);
+            }
+            hoverVisuals.Clear();
         }
 
         private IEnumerable<Point> EnumerateBrushCells(Point center)
@@ -408,7 +420,7 @@ namespace GameOfLife
             {
                 UpdateHoverCells(hoverCenterCell.Value);
             }
-            DrawCells();
+            DrawHoverPreview();
         }
 
 
@@ -459,12 +471,21 @@ namespace GameOfLife
             bool rightPressed = e.RightButton == MouseButtonState.Pressed;
 
             if (leftPressed)
+            {
                 AddCellsBetween(lastCell, currentCell, true);
+                DrawCells();
+            }
             else if (rightPressed)
+            {
                 AddCellsBetween(lastCell, currentCell, false);
+                DrawCells();
+            }
+            else
+            {
+                DrawHoverPreview();
+            }
 
             lastCell = currentCell;
-            DrawCells();
         }
 
         private void Canvas_MouseUp(object sender, MouseButtonEventArgs e)
