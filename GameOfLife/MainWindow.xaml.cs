@@ -199,6 +199,8 @@ namespace GameOfLife
         // Zoom
         private void ZoomSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
+            if (GameCanvas == null) return; // Prevent crash on initialization
+
             lock (_gridLock)
             {
                 int oldZoomLevel = _zoomLevel;
@@ -206,18 +208,29 @@ namespace GameOfLife
 
                 if (oldZoomLevel == newZoomLevel) return;
 
-                int zoomDiff = newZoomLevel - oldZoomLevel;
+                int oldGridWidth = GridWidth;
+                int oldGridHeight = GridHeight;
 
-                // Shift existing live cells to keep them centered
-                var shiftedLiveCells = new HashSet<Point>();
-                foreach (var cell in liveCells)
-                {
-                    shiftedLiveCells.Add(new Point(cell.X + zoomDiff, cell.Y + zoomDiff));
-                }
-                liveCells = shiftedLiveCells;
-
+                // First, calculate the new dimensions
                 _zoomLevel = newZoomLevel;
                 UpdateGridDimensions();
+
+                // Calculate the actual shift needed for both axes
+                int shiftX = (GridWidth - oldGridWidth) / 2;
+                int shiftY = (GridHeight - oldGridHeight) / 2;
+
+                // Then, create the new set of live cells, shifted and filtered
+                var newLiveCells = new HashSet<Point>();
+                foreach (var cell in liveCells)
+                {
+                    var newPoint = new Point(cell.X + shiftX, cell.Y + shiftY);
+                    if (newPoint.X >= 0 && newPoint.X < GridWidth && newPoint.Y >= 0 && newPoint.Y < GridHeight)
+                    {
+                        newLiveCells.Add(newPoint);
+                    }
+                }
+                liveCells = newLiveCells;
+
                 DrawCells();
             }
         }
@@ -227,7 +240,7 @@ namespace GameOfLife
         {
             if (CanvasContainer == null || GameCanvas == null || CanvasContainer.ActualWidth <= 0 || CanvasContainer.ActualHeight <= 0) return;
 
-            GridWidth = _baseGridWidth + _zoomLevel;
+            GridWidth = _baseGridWidth + _zoomLevel * 2;
 
             // Calculate cell size based on width
             cellSize = CanvasContainer.ActualWidth / GridWidth;
@@ -235,7 +248,7 @@ namespace GameOfLife
             if (cellSize <= 0) return; // Prevent division by zero
 
             // Calculate grid height to fill the canvas with square cells
-            GridHeight = (int)Math.Ceiling(CanvasContainer.ActualHeight / cellSize);
+            GridHeight = (int)Math.Floor(CanvasContainer.ActualHeight / cellSize);
 
             GameCanvas.Width = GridWidth * cellSize;
             GameCanvas.Height = GridHeight * cellSize;
