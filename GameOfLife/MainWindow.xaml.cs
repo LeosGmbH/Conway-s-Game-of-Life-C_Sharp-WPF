@@ -32,6 +32,8 @@ namespace GameOfLife
         private readonly Path liveCellPath = new Path { IsHitTestVisible = false };
         private readonly DispatcherTimer zoomRedrawTimer;
         private bool zoomRedrawPending = false;
+        private const string DefaultPrefabButtonContent = "Select Prefab";
+        private string? _selectedPrefabName;
 
         private void ApplyTheme()
         {
@@ -403,13 +405,37 @@ namespace GameOfLife
         // DrawMode
         private void DrawModeSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (PrefabPicker == null) return;  // <- schützt vor NullReferenceException
-            PrefabPicker.IsEnabled = DrawModeSelector.SelectedIndex == 1;
+            if (PrefabSelectorButton == null) return;  // <- schützt vor NullReferenceException
+            PrefabSelectorButton.IsEnabled = DrawModeSelector.SelectedIndex == 1;
         }
 
 
-        // Prefab Auswahl
-        private void PrefabPicker_SelectionChanged(object sender, SelectionChangedEventArgs e) { }
+        private void PrefabSelectorButton_Click(object sender, RoutedEventArgs e)
+        {
+            var previewWindow = new PrefabPreviewWindow
+            {
+                Owner = this
+            };
+
+            var result = previewWindow.ShowDialog();
+            if (result == true && previewWindow.SelectedPattern != null)
+            {
+                _selectedPrefabName = previewWindow.SelectedPattern.Name;
+                UpdatePrefabButtonContent();
+            }
+        }
+
+        private void UpdatePrefabButtonContent()
+        {
+            if (PrefabSelectorButton == null)
+            {
+                return;
+            }
+
+            PrefabSelectorButton.Content = string.IsNullOrWhiteSpace(_selectedPrefabName)
+                ? DefaultPrefabButtonContent
+                : _selectedPrefabName;
+        }
 
         // Preview
         private void Preview_Click(object sender, RoutedEventArgs e)

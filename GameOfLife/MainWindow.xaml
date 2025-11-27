@@ -36,12 +36,11 @@
             </ComboBox>
 
             <!-- Prefab Picker -->
-            <ComboBox x:Name="PrefabPicker" Width="160" IsEnabled="False" SelectionChanged="PrefabPicker_SelectionChanged">
-                <ComboBoxItem Content="Glider"/>
-                <ComboBoxItem Content="LWSS"/>
-                <ComboBoxItem Content="Pulsar"/>
-                <ComboBoxItem Content="Gosper Gun"/>
-            </ComboBox>
+            <Button x:Name="PrefabSelectorButton"
+                    Width="160"
+                    Content="Select Prefab"
+                    IsEnabled="False"
+                    Click="PrefabSelectorButton_Click"/>
 
             <!-- Brush Size -->
             <StackPanel Margin="20,0,0,0" Width="130">
