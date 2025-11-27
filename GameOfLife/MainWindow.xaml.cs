@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -25,6 +26,7 @@ namespace GameOfLife
         private readonly List<Point> hoverCells = new List<Point>();
         private Point? hoverCenterCell = null;
         private readonly List<Rectangle> hoverVisuals = new List<Rectangle>();
+        private readonly Dictionary<Point, Rectangle> liveCellVisuals = new Dictionary<Point, Rectangle>();
 
         private void ApplyTheme()
         {
@@ -67,6 +69,8 @@ namespace GameOfLife
                 }
 
                 GameCanvas.Children.Clear();
+                liveCellVisuals.Clear();
+                hoverVisuals.Clear();
 
                 int startX = 0;
                 int startY = 0;
@@ -117,8 +121,6 @@ namespace GameOfLife
 
         private void DrawLiveCells(int startX, int startY, int endX, int endY)
         {
-            var liveCellBrush = (Brush)Resources["LiveCellColor"];
-
             foreach (var cell in liveCells)
             {
                 int x = (int)cell.X;
@@ -126,15 +128,7 @@ namespace GameOfLife
 
                 if (x >= startX && x <= endX && y >= startY && y <= endY)
                 {
-                    var rect = new Rectangle
-                    {
-                        Width = cellSize,
-                        Height = cellSize,
-                        Fill = liveCellBrush
-                    };
-                    Canvas.SetLeft(rect, x * cellSize);
-                    Canvas.SetTop(rect, y * cellSize);
-                    GameCanvas.Children.Add(rect);
+                    AddLiveCellVisual(new Point(x, y));
                 }
             }
         }
@@ -159,29 +153,40 @@ namespace GameOfLife
 
         private void DrawHoverPreview()
         {
-            foreach (var outline in hoverVisuals)
-            {
-                GameCanvas.Children.Remove(outline);
-            }
-            hoverVisuals.Clear();
+            int required = hoverCells.Count;
 
-            if (hoverCells.Count == 0) return;
-
-            foreach (var cell in hoverCells)
+            for (int i = 0; i < required; i++)
             {
-                var outline = new Rectangle
+                Rectangle outline;
+                if (i < hoverVisuals.Count)
                 {
-                    Width = cellSize,
-                    Height = cellSize,
-                    Stroke = Brushes.Red,
-                    StrokeThickness = 1,
-                    Fill = Brushes.Transparent
-                };
+                    outline = hoverVisuals[i];
+                }
+                else
+                {
+                    outline = new Rectangle
+                    {
+                        Stroke = Brushes.Red,
+                        StrokeThickness = 1,
+                        Fill = Brushes.Transparent,
+                        IsHitTestVisible = false
+                    };
+                    hoverVisuals.Add(outline);
+                    GameCanvas.Children.Add(outline);
+                }
 
+                outline.Width = cellSize;
+                outline.Height = cellSize;
+                outline.Visibility = Visibility.Visible;
+
+                var cell = hoverCells[i];
                 Canvas.SetLeft(outline, cell.X * cellSize);
                 Canvas.SetTop(outline, cell.Y * cellSize);
-                GameCanvas.Children.Add(outline);
-                hoverVisuals.Add(outline);
+            }
+
+            for (int i = required; i < hoverVisuals.Count; i++)
+            {
+                hoverVisuals[i].Visibility = Visibility.Collapsed;
             }
         }
 
@@ -217,9 +222,8 @@ namespace GameOfLife
             hoverCenterCell = null;
             foreach (var outline in hoverVisuals)
             {
-                GameCanvas.Children.Remove(outline);
+                outline.Visibility = Visibility.Collapsed;
             }
-            hoverVisuals.Clear();
         }
 
         private IEnumerable<Point> EnumerateBrushCells(Point center)
@@ -283,6 +287,36 @@ namespace GameOfLife
             foreach (var cell in EnumerateBrushCells(center))
             {
                 UpdateCell(cell, add);
+            }
+        }
+
+        private void AddLiveCellVisual(Point cell)
+        {
+            if (liveCellVisuals.ContainsKey(cell))
+            {
+                return;
+            }
+
+            var rect = new Rectangle
+            {
+                Width = cellSize,
+                Height = cellSize,
+                Fill = (Brush)Resources["LiveCellColor"],
+                IsHitTestVisible = false
+            };
+
+            Canvas.SetLeft(rect, cell.X * cellSize);
+            Canvas.SetTop(rect, cell.Y * cellSize);
+            GameCanvas.Children.Add(rect);
+            liveCellVisuals[cell] = rect;
+        }
+
+        private void RemoveLiveCellVisual(Point cell)
+        {
+            if (liveCellVisuals.TryGetValue(cell, out var rect))
+            {
+                GameCanvas.Children.Remove(rect);
+                liveCellVisuals.Remove(cell);
             }
         }
 
@@ -473,18 +507,13 @@ namespace GameOfLife
             if (leftPressed)
             {
                 AddCellsBetween(lastCell, currentCell, true);
-                DrawCells();
             }
             else if (rightPressed)
             {
                 AddCellsBetween(lastCell, currentCell, false);
-                DrawCells();
-            }
-            else
-            {
-                DrawHoverPreview();
             }
 
+            DrawHoverPreview();
             lastCell = currentCell;
         }
 
@@ -523,27 +552,36 @@ namespace GameOfLife
             }
         }
 
-        private void UpdateCell(Point cell, bool add)
+        private bool UpdateCell(Point cell, bool add)
         {
             int cellX = (int)cell.X;
             int cellY = (int)cell.Y;
 
             if (!IsCellWithinGrid(cellX, cellY))
             {
-                return;
+                return false;
             }
 
             cell = new Point(cellX, cellY);
 
             if (add)
             {
-                if (!liveCells.Contains(cell))
-                    liveCells.Add(cell);
+                if (liveCells.Add(cell))
+                {
+                    AddLiveCellVisual(cell);
+                    return true;
+                }
             }
             else
             {
-                liveCells.Remove(cell);
+                if (liveCells.Remove(cell))
+                {
+                    RemoveLiveCellVisual(cell);
+                    return true;
+                }
             }
+
+            return false;
         }
 
 
@@ -580,7 +618,7 @@ namespace GameOfLife
 
             lastCell = cell;
             UpdateHoverCells(cell);
-            DrawCells();
+            DrawHoverPreview();
         }
     }
 }
