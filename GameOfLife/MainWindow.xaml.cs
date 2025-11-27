@@ -1,4 +1,6 @@
-﻿using System.Windows;
+﻿
+
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -11,10 +13,15 @@ namespace GameOfLife
 
         private HashSet<Point> liveCells = new HashSet<Point>();
 
-        // Zellen-Größe in Pixel
-        private double cellSize = 20;
+        // Grid-Einstellungen
+        private int _baseGridWidth = 10;
+        private int _zoomLevel = 0;
+        private int GridWidth;
+        private int GridHeight;
+        private double cellSize;
 
         private bool isDarkMode = true;
+        private readonly object _gridLock = new object();
 
         private void ApplyTheme()
         {
@@ -49,49 +56,66 @@ namespace GameOfLife
 
         private void DrawCells()
         {
-            GameCanvas.Children.Clear();
+            lock (_gridLock)
+            {
+                if (double.IsNaN(GameCanvas.Width) || double.IsNaN(GameCanvas.Height) || GridWidth <= 0 || GridHeight <= 0)
+                {
+                    return;
+                }
 
-            double offsetX = Scroll.HorizontalOffset;
-            double offsetY = Scroll.VerticalOffset;
-            double viewWidth = Scroll.ViewportWidth;
-            double viewHeight = Scroll.ViewportHeight;
+                GameCanvas.Children.Clear();
 
-            int startX = (int)(offsetX / cellSize);
-            int startY = (int)(offsetY / cellSize);
-            int endX = (int)((offsetX + viewWidth) / cellSize);
-            int endY = (int)((offsetY + viewHeight) / cellSize);
+                // Begrenze die Sichtbarkeit auf das Grid
+                int startX = 0;
+                int startY = 0;
+                int endX = GridWidth - 1;
+                int endY = GridHeight - 1;
 
-            // Draw grid lines
+                // Zeichne das sichtbare Grid
+                DrawGrid(startX, startY, endX, endY);
+                DrawLiveCells(startX, startY, endX, endY);
+            }
+        }
+
+        private void DrawGrid(int startX, int startY, int endX, int endY)
+        {
             var gridBrush = (Brush)Resources["GridLineColor"];
-            for (int x = startX; x <= endX; x++)
+
+            // Draw vertical lines
+            for (int x = startX; x <= endX + 1; x++)
             {
                 var line = new Line
                 {
                     X1 = x * cellSize,
-                    Y1 = startY * cellSize,
+                    Y1 = 0,
                     X2 = x * cellSize,
-                    Y2 = (endY + 1) * cellSize,
+                    Y2 = GameCanvas.Height,
                     Stroke = gridBrush,
-                    StrokeThickness = 1
-                };
-                GameCanvas.Children.Add(line);
-            }
-            for (int y = startY; y <= endY; y++)
-            {
-                var line = new Line
-                {
-                    X1 = startX * cellSize,
-                    Y1 = y * cellSize,
-                    X2 = (endX + 1) * cellSize,
-                    Y2 = y * cellSize,
-                    Stroke = gridBrush,
-                    StrokeThickness = 1
+                    StrokeThickness = 0.5
                 };
                 GameCanvas.Children.Add(line);
             }
 
-            // Draw live cells
+            // Draw horizontal lines
+            for (int y = startY; y <= endY + 1; y++)
+            {
+                var line = new Line
+                {
+                    X1 = 0,
+                    Y1 = y * cellSize,
+                    X2 = GameCanvas.Width,
+                    Y2 = y * cellSize,
+                    Stroke = gridBrush,
+                    StrokeThickness = 0.5
+                };
+                GameCanvas.Children.Add(line);
+            }
+        }
+
+        private void DrawLiveCells(int startX, int startY, int endX, int endY)
+        {
             var liveCellBrush = (Brush)Resources["LiveCellColor"];
+
             foreach (var cell in liveCells)
             {
                 int x = (int)cell.X;
@@ -99,10 +123,10 @@ namespace GameOfLife
 
                 if (x >= startX && x <= endX && y >= startY && y <= endY)
                 {
-                    Rectangle rect = new Rectangle
+                    var rect = new Rectangle
                     {
-                        Width = cellSize - 1,
-                        Height = cellSize - 1,
+                        Width = cellSize,
+                        Height = cellSize,
                         Fill = liveCellBrush
                     };
                     Canvas.SetLeft(rect, x * cellSize);
@@ -116,17 +140,30 @@ namespace GameOfLife
 
 
 
-        private void Scroll_ScrollChanged(object sender, ScrollChangedEventArgs e)
-        {
-            DrawCells();
-        }
-
 
 
         public MainWindow()
         {
             InitializeComponent();
             ApplyTheme();
+
+            this.Loaded += MainWindow_Loaded;
+            CanvasContainer.SizeChanged += CanvasContainer_SizeChanged;
+        }
+
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            UpdateGridDimensions();
+            DrawCells();
+        }
+
+        private void CanvasContainer_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            lock (_gridLock)
+            {
+                UpdateGridDimensions();
+                DrawCells();
+            }
         }
 
         // Simulation Buttons
@@ -160,11 +197,53 @@ namespace GameOfLife
         }
 
         // Zoom
-        private void ZoomSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) { }
-        private void Canvas_MouseWheel(object sender, MouseWheelEventArgs e) { }
+        private void ZoomSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            lock (_gridLock)
+            {
+                int oldZoomLevel = _zoomLevel;
+                int newZoomLevel = (int)e.NewValue;
+
+                if (oldZoomLevel == newZoomLevel) return;
+
+                int zoomDiff = newZoomLevel - oldZoomLevel;
+
+                // Shift existing live cells to keep them centered
+                var shiftedLiveCells = new HashSet<Point>();
+                foreach (var cell in liveCells)
+                {
+                    shiftedLiveCells.Add(new Point(cell.X + zoomDiff, cell.Y + zoomDiff));
+                }
+                liveCells = shiftedLiveCells;
+
+                _zoomLevel = newZoomLevel;
+                UpdateGridDimensions();
+                DrawCells();
+            }
+        }
+
+
+        private void UpdateGridDimensions()
+        {
+            if (CanvasContainer == null || GameCanvas == null || CanvasContainer.ActualWidth <= 0 || CanvasContainer.ActualHeight <= 0) return;
+
+            GridWidth = _baseGridWidth + _zoomLevel;
+
+            // Calculate cell size based on width
+            cellSize = CanvasContainer.ActualWidth / GridWidth;
+
+            if (cellSize <= 0) return; // Prevent division by zero
+
+            // Calculate grid height to fill the canvas with square cells
+            GridHeight = (int)Math.Ceiling(CanvasContainer.ActualHeight / cellSize);
+
+            GameCanvas.Width = GridWidth * cellSize;
+            GameCanvas.Height = GridHeight * cellSize;
+        }
 
         // Canvas Interaktion
         private Point? lastCell = null;
+
 
         private void Canvas_MouseMove(object sender, MouseEventArgs e)
         {
@@ -237,6 +316,14 @@ namespace GameOfLife
 
         private void Canvas_LeftUp(object sender, MouseButtonEventArgs e) { }
         private void Canvas_RightUp(object sender, MouseButtonEventArgs e) { }
-        private void Canvas_MouseDown(object sender, MouseButtonEventArgs e) { }
+        
+        private void Canvas_MouseLeave(object sender, MouseEventArgs e)
+        {
+            lastCell = null;
+        }
+        private void Canvas_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            // Leere Methode, da kein Panning mehr benötigt wird
+        }
     }
 }

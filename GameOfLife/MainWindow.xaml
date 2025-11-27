@@ -51,23 +51,23 @@
 
             <!-- Zoom -->
             <StackPanel Margin="20,0,0,0">
-                <TextBlock Text="Zoom" HorizontalAlignment="Center"/>
-                <Slider x:Name="ZoomSlider" Minimum="0.5" Maximum="3.0" Value="1.0"
+                <TextBlock Text="GridSize" HorizontalAlignment="Center"/>
+                <Slider x:Name="ZoomSlider" Minimum="0" Maximum="30" Value="0" IsSnapToTickEnabled="True" TickFrequency="1"
                         Width="150" ValueChanged="ZoomSlider_ValueChanged"/>
             </StackPanel>
 
         </ToolBar>
 
         <!-- SPIEL-CANVAS -->
-        <ScrollViewer x:Name="Scroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
-              ScrollChanged="Scroll_ScrollChanged">
+        <Border x:Name="CanvasContainer" ClipToBounds="True">
             <Canvas x:Name="GameCanvas" Background="#222"
             MouseLeftButtonDown="Canvas_MouseUp"
             MouseLeftButtonUp="Canvas_MouseDown"
             MouseMove="Canvas_MouseMove"
             MouseDown="Canvas_MouseDown"
-            MouseWheel="Canvas_MouseWheel"/>
-        </ScrollViewer>
+            MouseUp="Canvas_MouseUp"
+            MouseLeave="Canvas_MouseLeave"/>
+        </Border>
 
 
     </DockPanel>
